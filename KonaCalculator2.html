@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Kona Event Cost Calculator</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f1e9;
+  color: #000;
+  padding: 1rem;
+  max-width: 600px;
+  margin: auto;
+}
+h1, h2 {
+  text-align: center;
+}
+.input-group {
+  margin: 1rem 0;
+}
+label {
+  font-weight: bold;
+}
+select, input {
+  font-size: 1rem;
+  padding: 4px;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+th, td {
+  border: 1px solid #555;
+  padding: 0.5rem;
+  text-align: center;
+}
+.footer {
+  font-style: italic;
+  text-align: center;
+}
+.actions {
+  display: flex;
+  justify-content: space-around;
+  margin: 1rem 0;
+}
+</style>
+<body>
+<h1>Kona Event Cost Calculator</h1>
+
+<div class="input-group">
+  <label>Event Name:</label><br/>
+  <input type="text" id="eventName" placeholder="Enter Event Name">
+</div>
+
+<div class="input-group">
+  <label>Number of Servings:</label><br/>
+  <input type="number" id="servings" value="100" min="1">
+</div>
+
+<div class="input-group">
+  <label>Event Type:</label><br/>
+  <select id="eventType">
+    <option value="corporate">Corporate</option>
+    <option value="public">Public</option>
+    <option value="private">Private</option>
+    <option value="school">School</option>
+  </select>
+</div>
+
+<div class="input-group">
+  <label>Duration (Hours):</label><br/>
+  <input type="number" id="duration" value="1" min="1">
+</div>
+
+<div class="input-group">
+  <label><input type="checkbox" id="onlineFee"> Add 3.3% online payment fee</label>
+</div>
+
+<h2>Results</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Size</th>
+      <th>Cost per Serving</th>
+      <th>Subtotal</th>
+      <th>Hourly Cost</th>
+      <th>Final Total</th>
+    </tr>
+  </thead>
+  <tbody id="resultsContainer"></tbody>
+</table>
+
+<h3>Hourly Cost Key:</h3>
+<ul>
+  <li>Corporate: $200 first hour, $100 each additional</li>
+  <li>Public: $150 first hour, $100 each additional</li>
+  <li>Private: $100 first hour, $100 each additional</li>
+  <li>School: $0 hourly cost</li>
+</ul>
+
+<div class="actions">
+  <button id="saveButton">Save Event</button>
+  <select id="loadSelect">
+    <option value="">Load Event</option>
+  </select>
+  <button id="resetButton">Reset</button>
+</div>
+
+<div class="footer">Final total respects the $350 minimum requirement.</div>
+
+<script>
+const hourlyRates = {
+  corporate: [200, 100],
+  public: [150, 100],
+  private: [100, 100],
+  school: [0, 0]
+};
+const sizes = [
+  {name: "Kiddie (9oz)", price: 4.0},
+  {name: "Klassic (12oz)", price: 5.0},
+  {name: "King (16oz)", price: 6.0}
+];
+const savedEvents = JSON.parse(localStorage.getItem("savedEvents")) || [];
+
+function calculate() {
+  const servings = parseInt(document.getElementById("servings").value);
+  const eventType = document.getElementById("eventType").value;
+  const duration = parseInt(document.getElementById("duration").value);
+  const onlineFeeChecked = document.getElementById("onlineFee").checked;
+
+  const baseRates = hourlyRates[eventType];
+  const hourlyCost = baseRates[0] + Math.max(0, duration-1) * baseRates[1];
+  const resultsContainer = document.getElementById("resultsContainer");
+  resultsContainer.innerHTML = ""; 
+
+  sizes.forEach(size => {
+    const discount = servings >= 300 ? 0.25 : 0;
+    const perServingCost = Math.max(size.price - discount, 0);
+    const subtotal = perServingCost * servings;
+    const total = subtotal + hourlyCost;
+    const adjustedTotal = total < 350 ? 350 : total;
+    const finalTotal = onlineFeeChecked 
+                      ? adjustedTotal * 1.033 
+                      : adjustedTotal;
+
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${size.name}</td>
+      <td>$${perServingCost.toFixed(2)}</td>
+      <td>$${subtotal.toFixed(2)}</td>
+      <td>$${hourlyCost.toFixed(2)}</td>
+      <td>$${finalTotal.toFixed(2)}</td>
+    `;
+    resultsContainer.appendChild(row);
+  });
+}
+function saveEvent() {
+  const name = document.getElementById("eventName").value.trim();
+  if (!name) {
+    alert("Please enter an Event Name before saving.");
+    return;
+  }
+  const data = {
+    name,
+    servings: document.getElementById("servings").value,
+    eventType: document.getElementById("eventType").value,
+    duration: document.getElementById("duration").value,
+    onlineFee: document.getElementById("onlineFee").checked
+  };
+  if (savedEvents.find(event => event.name === name)) {
+    alert("An event with this name already exists.");
+    return;
+  }
+  if (savedEvents.length >= 3) {
+    alert("You can only save up to 3 events. Delete or overwrite an existing one first.");
+    return;
+  }
+  savedEvents.push(data);
+  localStorage.setItem("savedEvents", JSON.stringify(savedEvents));
+  populateLoadOptions();
+}
+function loadEvent() {
+  const selectedName = document.getElementById("loadSelect").value;
+  if (!selectedName) return;
+  const data = savedEvents.find(event => event.name === selectedName);
+  if (!data) return;
+
+  document.getElementById("eventName").value = data.name;
+  document.getElementById("servings").value = data.servings;
+  document.getElementById("eventType").value = data.eventType;
+  document.getElementById("duration").value = data.duration;
+  document.getElementById("onlineFee").checked = data.onlineFee;
+
+  calculate();
+}
+function resetForm() {
+  document.getElementById("eventName").value = '';
+  document.getElementById("servings").value = '100';
+  document.getElementById("eventType").value = 'corporate';
+  document.getElementById("duration").value = '1';
+  document.getElementById("onlineFee").checked = false;
+  document.getElementById("resultsContainer").innerHTML = '';
+}
+function populateLoadOptions() {
+  const loadSelect = document.getElementById("loadSelect");
+  loadSelect.innerHTML = '<option value="">Load Event</option>';
+  savedEvents.forEach(event => {
+    const option = document.createElement("option");
+    option.value = event.name;
+    option.textContent = event.name;
+    loadSelect.appendChild(option);
+  });
+}
+document.querySelectorAll('#servings, #eventType, #duration, #onlineFee')
+  .forEach(el => el.addEventListener('input', calculate));
+document.getElementById("saveButton").addEventListener("click", saveEvent);
+document.getElementById("loadSelect").addEventListener("change", loadEvent);
+document.getElementById("resetButton").addEventListener("click", resetForm);
+
+// Initialize
+populateLoadOptions();
+calculate();
+</script>
+</body>
+</html>
