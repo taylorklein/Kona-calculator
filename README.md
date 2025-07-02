@@ -1,1 +1,1 @@
-# Kona-calculator
+# kona-calculator
